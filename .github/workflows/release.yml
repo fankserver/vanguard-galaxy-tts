@@ -74,7 +74,10 @@ jobs:
           rm -rf "dist/${PKG_NAME}"
           mkdir -p "$PKG_DIR/prerender" "$PKG_DIR/tools"
 
-          cp VGTTS/bin/Debug/netstandard2.1/VGTTS.dll "$PKG_DIR/"
+          # *.dll = VGTTS.dll + bundled runtime dep (Newtonsoft.Json, which game
+          # 0.8.1 no longer ships). CopyLocalLockFileAssemblies keeps this to just
+          # those — BepInEx/Harmony/Unity are compile-only.
+          cp VGTTS/bin/Debug/netstandard2.1/*.dll "$PKG_DIR/"
           cp LICENSE THIRD_PARTY_NOTICES.md README.md "$PKG_DIR/"
 
           # Prerender pack — preserve speaker-folder tree, skip variants/
