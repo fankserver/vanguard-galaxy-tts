@@ -188,7 +188,7 @@ internal static class BarPatronPatches
     {
         var cfg = Plugin.Instance.CfgCaptainPreset.Value?.ToLowerInvariant() ?? "auto";
         if (cfg is "m1" or "m2" or "m3" or "f1" or "f2" or "f3") return "captain_" + cfg;
-        var isFemale = Source.Player.GamePlayer.current?.commander?.gender == Source.Crew.Gender.Female;
+        var isFemale = Source.Player.GamePlayer.current?.commander?.gender == Source.Personnel.Gender.Female;
         return isFemale ? "captain_f1" : "captain_m1";
     }
 }

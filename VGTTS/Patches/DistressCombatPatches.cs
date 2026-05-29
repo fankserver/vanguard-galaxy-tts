@@ -67,7 +67,7 @@ internal static class DistressCombatPatches
             if (unit is SpaceShipData ship && ship.commanderData != null)
             {
                 friendName = ship.commanderData.firstName;
-                friendIsMale = ship.commanderData.gender == Source.Crew.Gender.Male;
+                friendIsMale = ship.commanderData.gender == Source.Personnel.Gender.Male;
                 break;
             }
         }

@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Behaviour.Dialogues;
 using HarmonyLib;
-using Source.Crew;
+using Source.Personnel;
 using Source.Dialogues;
 using Source.Player;
 using VGTTS.Audio;

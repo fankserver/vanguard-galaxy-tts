@@ -19,7 +19,7 @@ public class Plugin : BaseUnityPlugin
     public const string PluginName = "Vanguard Galaxy TTS";
     // BepInEx parses PluginVersion through System.Version which rejects SemVer
     // pre-release suffixes, so stick to the plain N.N.N form.
-    public const string PluginVersion = "1.6.1";
+    public const string PluginVersion = "1.6.2";
 
     internal static Plugin Instance { get; private set; } = null!;
     internal static ManualLogSource Log { get; private set; } = null!;

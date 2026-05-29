@@ -14,6 +14,10 @@
       https://nuget.bepinex.dev/v3/index.json;
       https://nuget.samboy.dev/v3/index.json
     </RestoreAdditionalProjectSources>
+    <!-- Drops runtime-only package deps (Newtonsoft.Json) into bin so the
+         deploy can ship them. Game 0.8.1 removed Newtonsoft.Json.dll from
+         Managed/, so the plugin must now carry its own copy. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,8 +25,15 @@
     <PackageReference Include="BepInEx.Core" Version="5.*" />
     <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
     <PackageReference Include="UnityEngine.Modules" Version="6000.2.6" IncludeAssets="compile" />
-    <PackageReference Include="HarmonyX" Version="2.16.*" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" IncludeAssets="compile" />
+    <!-- Pinned to 2.10.x: BepInEx 5 ships HarmonyX 2.10, and 2.16 adds a
+         transitive dep on MonoMod.Backports that BepInEx 5 doesn't load at
+         runtime (FileNotFoundException on plugin startup). Deploy only ships
+         VGTTS.dll, so the MonoMod runtime DLLs wouldn't go along anyway.
+         Keep aligned with the sibling plugins until BepInEx 5 bumps its
+         bundled HarmonyX. -->
+    <PackageReference Include="HarmonyX" Version="2.10.*" />
+    <!-- Ships at runtime: game 0.8.1 no longer provides Newtonsoft.Json.dll. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" IncludeAssets="compile;runtime" />
   </ItemGroup>
 
   <ItemGroup>

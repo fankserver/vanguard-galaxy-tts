@@ -12,7 +12,7 @@ PLUGIN_DIR := $(GAME_DIR)/BepInEx/plugins
 # Resolve dotnet — prefer explicit local SDK, fall back to PATH
 DOTNET   ?= $(shell command -v dotnet 2>/dev/null || echo /tmp/dnsdk/dotnet/dotnet)
 
-BEPINEX_VERSION := 5.4.23.2
+BEPINEX_VERSION := 5.4.23.5
 BEPINEX_URL     := https://github.com/BepInEx/BepInEx/releases/download/v$(BEPINEX_VERSION)/BepInEx_win_x64_$(BEPINEX_VERSION).zip
 
 .PHONY: all build link-asm clean deploy deploy-bundle deploy-prerender \
@@ -64,6 +64,9 @@ deploy: build check-bepinex
 	@mkdir -p "$(VGTTS_DIR)"
 	cp "$(BUILDDLL)" "$(VGTTS_DIR)/"
 	@if [ -f "$(BUILDDIR)/VGTTS.pdb" ]; then cp "$(BUILDDIR)/VGTTS.pdb" "$(VGTTS_DIR)/"; fi
+	# Game 0.8.1 dropped Newtonsoft.Json.dll from Managed/; ship our own copy
+	# (CopyLocalLockFileAssemblies puts it in bin). Skips gracefully if absent.
+	@if [ -f "$(BUILDDIR)/Newtonsoft.Json.dll" ]; then cp "$(BUILDDIR)/Newtonsoft.Json.dll" "$(VGTTS_DIR)/"; fi
 	@echo "Deployed $(DLL) to $(VGTTS_DIR)"
 	@$(MAKE) deploy-bundle
 	@$(MAKE) deploy-prerender
