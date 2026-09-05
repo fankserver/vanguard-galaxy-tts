@@ -16,6 +16,12 @@ updates:
       # Stay on the 5.x stable line until there's a deliberate migration.
       - dependency-name: "BepInEx.Core"
         update-types: ["version-update:semver-major"]
+      # Pinned to 2.10.x: BepInEx 5 ships HarmonyX 2.10 at runtime; 2.16+
+      # adds a MonoMod.Backports dependency that isn't on the load path,
+      # causing FileNotFoundException at plugin startup. Unpin once
+      # BepInEx 5 bumps its bundled HarmonyX or we commit to shipping
+      # the MonoMod runtime DLLs alongside the plugin.
+      - dependency-name: "HarmonyX"
 
   - package-ecosystem: "github-actions"
     directory: "/"
