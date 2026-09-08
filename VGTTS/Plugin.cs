@@ -17,7 +17,7 @@ namespace VGTTS;
 public class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "vgtts";
-    public const string PluginName = "Vanguard Galaxy TTS";
+    public const string PluginName = "TTS";
     // BepInEx parses PluginVersion through System.Version which rejects SemVer
     // pre-release suffixes, so stick to the plain N.N.N form.
     public const string PluginVersion = "1.6.2";
