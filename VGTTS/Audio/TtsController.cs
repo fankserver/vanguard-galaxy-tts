@@ -81,6 +81,17 @@ internal sealed class TtsController
     /// name-substituted dialogue lines on a background task so the first
     /// utterance in dialogue doesn't pay a synth penalty.
     /// </summary>
+    internal BarWarmRetention.Lease RetainBarWarm(BarWarmRetention registry, string speaker, string text)
+    {
+        var synthText = TextNormalizer.ForTts(text);
+        var voice = _voices.Resolve(speaker);
+        var path = _cache.PathFor(synthText, voice, _voices.IsKnownSpeaker(speaker));
+        return registry.Acquire(path, async () =>
+        {
+            if (!_cache.Exists(path)) await SynthDedup(synthText, voice, path).ConfigureAwait(false);
+        }, () => { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); });
+    }
+
     public async Task<WarmResult> WarmCacheAsync(string speaker, string text, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(text)) return WarmResult.Skipped;

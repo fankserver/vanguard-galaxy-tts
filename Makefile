@@ -21,6 +21,10 @@ BEPINEX_URL     := https://github.com/BepInEx/BepInEx/releases/download/v$(BEPIN
 
 all: build
 
+.PHONY: test
+test:
+	$(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
+
 # One-time: download and unpack BepInEx 5 into the game folder.
 # Safe to re-run: overwrites loader files but leaves user plugins + config alone.
 install-bepinex:

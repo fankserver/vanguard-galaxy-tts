@@ -43,6 +43,8 @@ internal static class BarPatronPatches
     /// <summary>Per-patron record of the (speaker, text) pairs we warmed.
     /// ConditionalWeakTable so the entries GC when the BarPatron does.</summary>
     private static readonly ConditionalWeakTable<BarPatron, List<(string Speaker, string Text)>> _patronLines = new();
+    private static readonly ConditionalWeakTable<BarPatron, List<BarWarmRetention.Lease>> _warmLeases = new();
+    private static readonly BarWarmRetention _retention = new();
 
     /// <summary>
     /// Tasks spawned by Initialize_Postfix are appended here so callers
@@ -77,22 +79,26 @@ internal static class BarPatronPatches
         }
     }
 
-    /// <summary>Internal accessor for BarRefreshPatches — hands over the warmed
-    /// lines for a patron about to go out of scope so they can be evicted.</summary>
-    internal static bool TryTakeLines(BarPatron patron, out List<(string Speaker, string Text)> lines)
+    /// <summary>Release a departing patron's shared cache ownership; in-flight warming
+    /// finishes before unowned audio is evicted.</summary>
+    internal static void Retire(BarPatron patron)
     {
-        if (_patronLines.TryGetValue(patron, out lines))
-        {
-            _patronLines.Remove(patron);
-            return true;
-        }
-        lines = null!;
-        return false;
+        _patronLines.Remove(patron);
+        if (!_warmLeases.TryGetValue(patron, out var leases)) return;
+        _warmLeases.Remove(patron);
+        foreach (var lease in leases) lease.Dispose();
     }
 
     [HarmonyPostfix]
     [HarmonyPatch(nameof(BarPatron.Initialize))]
     private static void Initialize_Postfix(BarPatron __instance)
+    {
+        var bridge = BarRosterBridge.Current;
+        if (bridge?.IsActive == true && !bridge.CanWarm(__instance)) return;
+        WarmFinalized(__instance);
+    }
+
+    internal static void WarmFinalized(BarPatron __instance)
     {
         // Initialize() fires on every BarUI open (and every dialogue close
         // that triggers a UI refresh), for the SAME patrons. Skip if we've
@@ -155,6 +161,9 @@ internal static class BarPatronPatches
 
         if (pairs.Count == 0) return;
 
+        var leases = new List<BarWarmRetention.Lease>();
+        foreach (var pair in pairs) leases.Add(controller.RetainBarWarm(_retention, pair.Speaker, pair.Text));
+        _warmLeases.AddOrUpdate(__instance, leases);
         _patronLines.AddOrUpdate(__instance, pairs);
         Plugin.Log.LogDebug($"[bar-warm] {__instance.GetType().Name} '{__instance.name}' — warming {pairs.Count} line(s)");
 
@@ -167,12 +176,11 @@ internal static class BarPatronPatches
             await _warmGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                foreach (var (speaker, text) in pairs)
+                foreach (var lease in leases)
                 {
                     try
                     {
-                        await controller.WarmCacheAsync(speaker, TextNormalizer.ForTts(text), CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await lease.Run().ConfigureAwait(false);
                     }
                     catch { /* best-effort; StartDialogue fallback warms again on click */ }
                 }
@@ -207,6 +215,7 @@ internal static class BarPatronPatches
 internal static class BarRefreshPatches
 {
     private static readonly ConditionalWeakTable<Bar, List<BarPatron>> _snapshots = new();
+    private static readonly ConditionalWeakTable<Bar, List<BarPatron>> _finalized = new();
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(Bar.CheckUpdatePatrons))]
@@ -219,22 +228,22 @@ internal static class BarRefreshPatches
     [HarmonyPatch(nameof(Bar.CheckUpdatePatrons))]
     private static void CheckUpdatePatrons_Postfix(Bar __instance)
     {
-        if (!_snapshots.TryGetValue(__instance, out var before)) return;
-        _snapshots.Remove(__instance);
+        if (BarRosterBridge.Current?.IsActive == true) return;
+        ApplyFinalized(__instance, __instance.availablePatrons);
+    }
 
-        var controller = TtsController.Instance;
-        if (controller == null) return;
+    internal static void ApplyFinalized(Bar bar, IEnumerable<BarPatron> patrons)
+    {
+        if (!_snapshots.TryGetValue(bar, out var before) && !_finalized.TryGetValue(bar, out before)) before = new List<BarPatron>();
+        _snapshots.Remove(bar);
+        var after = new HashSet<BarPatron>(patrons);
+        _finalized.AddOrUpdate(bar, new List<BarPatron>(after));
 
-        var after = new HashSet<BarPatron>(__instance.availablePatrons);
         foreach (var patron in before)
         {
             if (after.Contains(patron)) continue;
             // Patron rolled off the roster — drop its warmed audio
-            if (BarPatronPatches.TryTakeLines(patron, out var lines))
-            {
-                foreach (var (speaker, text) in lines)
-                    controller.DropCache(speaker, text);
-            }
+            BarPatronPatches.Retire(patron);
         }
     }
 }
