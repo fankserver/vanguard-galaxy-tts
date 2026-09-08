@@ -94,6 +94,12 @@ internal static class BarPatronPatches
     [HarmonyPatch(nameof(BarPatron.Initialize))]
     private static void Initialize_Postfix(BarPatron __instance)
     {
+        if (BarRosterBridge.Current?.IsActive == true) return;
+        WarmFinalized(__instance);
+    }
+
+    internal static void WarmFinalized(BarPatron __instance)
+    {
         // Initialize() fires on every BarUI open (and every dialogue close
         // that triggers a UI refresh), for the SAME patrons. Skip if we've
         // already warmed this instance — cache is already hot, no need to
@@ -207,6 +213,7 @@ internal static class BarPatronPatches
 internal static class BarRefreshPatches
 {
     private static readonly ConditionalWeakTable<Bar, List<BarPatron>> _snapshots = new();
+    private static readonly ConditionalWeakTable<Bar, List<BarPatron>> _finalized = new();
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(Bar.CheckUpdatePatrons))]
@@ -219,13 +226,20 @@ internal static class BarRefreshPatches
     [HarmonyPatch(nameof(Bar.CheckUpdatePatrons))]
     private static void CheckUpdatePatrons_Postfix(Bar __instance)
     {
-        if (!_snapshots.TryGetValue(__instance, out var before)) return;
-        _snapshots.Remove(__instance);
+        if (BarRosterBridge.Current?.IsActive == true) return;
+        ApplyFinalized(__instance, __instance.availablePatrons);
+    }
+
+    internal static void ApplyFinalized(Bar bar, IEnumerable<BarPatron> patrons)
+    {
+        if (!_snapshots.TryGetValue(bar, out var before) && !_finalized.TryGetValue(bar, out before)) before = new List<BarPatron>();
+        _snapshots.Remove(bar);
+        var after = new HashSet<BarPatron>(patrons);
+        _finalized.AddOrUpdate(bar, new List<BarPatron>(after));
 
         var controller = TtsController.Instance;
         if (controller == null) return;
 
-        var after = new HashSet<BarPatron>(__instance.availablePatrons);
         foreach (var patron in before)
         {
             if (after.Contains(patron)) continue;

@@ -13,6 +13,7 @@ namespace VGTTS;
 
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 [BepInProcess("VanguardGalaxy.exe")]
+[BepInDependency("vgmodapi", BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "vgtts";
@@ -64,6 +65,7 @@ public class Plugin : BaseUnityPlugin
                     $"prerender entries: {prerender.EntryCount}, " +
                     $"prior prerender-misses: {unprerendered.SeenCount}");
 
+        Patches.BarRosterBridge.Start();
         _harmony = new Harmony(PluginGuid);
         _harmony.PatchAll(typeof(Patches.DialogueManagerPatches));
         _harmony.PatchAll(typeof(Patches.EchoRemarksPatches));
@@ -77,6 +79,7 @@ public class Plugin : BaseUnityPlugin
 
     private void OnDestroy()
     {
+        Patches.BarRosterBridge.Current?.Dispose();
         _harmony?.UnpatchSelf();
     }
 }
