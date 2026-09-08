@@ -1,4 +1,4 @@
-# Vanguard Galaxy TTS
+# TTS
 
 A BepInEx mod that voices every dialogue line in [Vanguard Galaxy](https://store.steampowered.com/app/2395170/Vanguard_Galaxy/) using neural text-to-speech.
 
