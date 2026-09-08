@@ -93,7 +93,8 @@ internal static class BarPatronPatches
     [HarmonyPatch(nameof(BarPatron.Initialize))]
     private static void Initialize_Postfix(BarPatron __instance)
     {
-        if (BarRosterBridge.Current?.IsActive == true) return;
+        var bridge = BarRosterBridge.Current;
+        if (bridge?.IsActive == true && !bridge.CanWarm(__instance)) return;
         WarmFinalized(__instance);
     }
 
