@@ -43,6 +43,8 @@ internal static class BarPatronPatches
     /// <summary>Per-patron record of the (speaker, text) pairs we warmed.
     /// ConditionalWeakTable so the entries GC when the BarPatron does.</summary>
     private static readonly ConditionalWeakTable<BarPatron, List<(string Speaker, string Text)>> _patronLines = new();
+    private static readonly ConditionalWeakTable<BarPatron, List<BarWarmRetention.Lease>> _warmLeases = new();
+    private static readonly BarWarmRetention _retention = new();
 
     /// <summary>
     /// Tasks spawned by Initialize_Postfix are appended here so callers
@@ -77,17 +79,14 @@ internal static class BarPatronPatches
         }
     }
 
-    /// <summary>Internal accessor for BarRefreshPatches — hands over the warmed
-    /// lines for a patron about to go out of scope so they can be evicted.</summary>
-    internal static bool TryTakeLines(BarPatron patron, out List<(string Speaker, string Text)> lines)
+    /// <summary>Release a departing patron's shared cache ownership; in-flight warming
+    /// finishes before unowned audio is evicted.</summary>
+    internal static void Retire(BarPatron patron)
     {
-        if (_patronLines.TryGetValue(patron, out lines))
-        {
-            _patronLines.Remove(patron);
-            return true;
-        }
-        lines = null!;
-        return false;
+        _patronLines.Remove(patron);
+        if (!_warmLeases.TryGetValue(patron, out var leases)) return;
+        _warmLeases.Remove(patron);
+        foreach (var lease in leases) lease.Dispose();
     }
 
     [HarmonyPostfix]
@@ -161,6 +160,9 @@ internal static class BarPatronPatches
 
         if (pairs.Count == 0) return;
 
+        var leases = new List<BarWarmRetention.Lease>();
+        foreach (var pair in pairs) leases.Add(controller.RetainBarWarm(_retention, pair.Speaker, pair.Text));
+        _warmLeases.AddOrUpdate(__instance, leases);
         _patronLines.AddOrUpdate(__instance, pairs);
         Plugin.Log.LogDebug($"[bar-warm] {__instance.GetType().Name} '{__instance.name}' — warming {pairs.Count} line(s)");
 
@@ -173,12 +175,11 @@ internal static class BarPatronPatches
             await _warmGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                foreach (var (speaker, text) in pairs)
+                foreach (var lease in leases)
                 {
                     try
                     {
-                        await controller.WarmCacheAsync(speaker, TextNormalizer.ForTts(text), CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await lease.Run().ConfigureAwait(false);
                     }
                     catch { /* best-effort; StartDialogue fallback warms again on click */ }
                 }
@@ -237,18 +238,11 @@ internal static class BarRefreshPatches
         var after = new HashSet<BarPatron>(patrons);
         _finalized.AddOrUpdate(bar, new List<BarPatron>(after));
 
-        var controller = TtsController.Instance;
-        if (controller == null) return;
-
         foreach (var patron in before)
         {
             if (after.Contains(patron)) continue;
             // Patron rolled off the roster — drop its warmed audio
-            if (BarPatronPatches.TryTakeLines(patron, out var lines))
-            {
-                foreach (var (speaker, text) in lines)
-                    controller.DropCache(speaker, text);
-            }
+            BarPatronPatches.Retire(patron);
         }
     }
 }

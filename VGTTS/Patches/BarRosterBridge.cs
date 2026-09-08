@@ -61,13 +61,14 @@ internal sealed class BarRosterBridge : IDisposable
                 || !Equals(shape.GetProperty("Seed")?.GetValue(row), after[i].seed)
                 || !Equals(shape.GetProperty("NativeKind")?.GetValue(row), after[i].GetType().Name)) return;
         }
-        BarRefreshPatches.ApplyFinalized(station.bar, after);
         for (int i = 0; i < after.Length; i++)
         {
             // Managed contacts own their narrative/voice behavior, not native Salesman dialogue.
             if (projected[i].GetType().GetProperty("OwnedId")?.GetValue(projected[i]) == null)
                 BarPatronPatches.WarmFinalized(after[i]);
         }
+        // Acquire replacement patrons' shared cache paths before retiring the old owners.
+        BarRefreshPatches.ApplyFinalized(station.bar, after);
     }
 
     public void Dispose()
