@@ -1,10 +1,49 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><TargetFramework>net10.0</TargetFramework><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable><Nullable>enable</Nullable></PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>VGTTS.Tests</RootNamespace>
+    <!-- Referencing VGTTS transitively pulls BepInEx/HarmonyX from nuget.bepinex.dev;
+         the test SDK + xunit packages live on nuget.org. Restore from both. -->
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Compile Include="../VGTTS/Audio/BarWarmRetention.cs" Link="BarWarmRetention.cs" />
-    <Compile Include="../VGTTS/Patches/FinalizedPatronAdmission.cs" Link="FinalizedPatronAdmission.cs" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
+    <!-- VGTTS types reference UnityEngine/Unity-object surfaces (SoundEmitter,
+         AudioSource) in fields and private methods; ship the reference
+         assemblies' runtime copies so the CLR can always resolve them. -->
+    <PackageReference Include="UnityEngine.Modules" Version="6000.2.6" />
+    <!-- BepInEx/HarmonyX/Newtonsoft.Json are compile-only in VGTTS (the game
+         provides them); xUnit needs runtime copies when the test host touches
+         types whose declaring types reference BepInEx.Configuration etc. -->
+    <PackageReference Include="BepInEx.BaseLib" Version="5.*" />
+    <PackageReference Include="HarmonyX" Version="2.10.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- BarWarmRetention / FinalizedPatronAdmission / DialogueTtsCoordinator
+         internals reach tests via VGTTS's InternalsVisibleTo + this ProjectReference. -->
+    <ProjectReference Include="..\VGTTS\VGTTS.csproj" />
+    <Reference Include="VGModAPI.Abstractions">
+      <HintPath>..\VGTTS\lib\VGModAPI.Abstractions.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- Publicized stub (make link-asm). Conditional so a not-yet-linked
+         checkout still restores; the tests never JIT game types. -->
+    <Reference Include="Assembly-CSharp" Condition="Exists('..\VGTTS\lib\Assembly-CSharp.dll')">
+      <HintPath>..\VGTTS\lib\Assembly-CSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

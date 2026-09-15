@@ -6,7 +6,9 @@ using Behaviour.AudioSystem;
 using Behaviour.Util;
 using Source.AudioSystem;
 using UnityEngine;
+using VGModAPI;
 using VGTTS.Cache;
+using VGTTS.Dialogue;
 using VGTTS.Prerender;
 using VGTTS.Text;
 using VGTTS.TTS;
@@ -18,7 +20,7 @@ namespace VGTTS.Audio;
 /// Orchestrates the full pipeline: cache lookup → (synth if miss) → load clip → play.
 /// Serializes one line at a time; a new <see cref="Speak"/> cancels whatever is in flight.
 /// </summary>
-internal sealed class TtsController
+internal sealed class TtsController : ITtsDialoguePlayer
 {
     public static TtsController? Instance { get; set; }
 
@@ -66,13 +68,30 @@ internal sealed class TtsController
 
     public void Speak(string speaker, string text)
     {
+        Speak(speaker, text, null);
+    }
+
+    void ITtsDialoguePlayer.Speak(string speaker, string text, IDialoguePresentation? presentation)
+        => Speak(speaker, text, presentation);
+
+    /// <summary>
+    /// <paramref name="presentation"/> is the VGModAPI dialogue lease the coordinator
+    /// won for this line: the synth wait is linked to its cancellation token (fired on
+    /// replacement/close/scene/session change) and <c>IsCurrent</c> is re-checked right
+    /// before playback so a stale completion can never start audio. Null for the
+    /// non-conversation channels (ECHO tips) that have no API lease.
+    /// </summary>
+    public void Speak(string speaker, string text, IDialoguePresentation? presentation)
+    {
         if (string.IsNullOrWhiteSpace(text) || Plugin.Instance == null) return;
 
         Stop();
 
-        var cts = new CancellationTokenSource();
+        var cts = presentation != null
+            ? CancellationTokenSource.CreateLinkedTokenSource(presentation.Cancellation)
+            : new CancellationTokenSource();
         _currentCts = cts;
-        Plugin.Instance.StartCoroutine(SpeakCoroutine(speaker, text, cts.Token));
+        Plugin.Instance.StartCoroutine(SpeakCoroutine(speaker, text, cts.Token, presentation));
     }
 
     /// <summary>
@@ -128,7 +147,8 @@ internal sealed class TtsController
 
     /// <summary>
     /// Interrupt any in-flight synthesis and fade out any currently playing audio.
-    /// Called on dialogue advance, dialogue close, and ECHO tip dismiss.
+    /// Called on dialogue-lease cancellation (advance/close/scene/session), by Speak's
+    /// own interrupt, and on ECHO tip dismiss.
     /// </summary>
     public void Stop()
     {
@@ -137,7 +157,7 @@ internal sealed class TtsController
         StopCurrent();
     }
 
-    private IEnumerator SpeakCoroutine(string speaker, string text, CancellationToken ct)
+    private IEnumerator SpeakCoroutine(string speaker, string text, CancellationToken ct, IDialoguePresentation? presentation)
     {
         var synthText = TextNormalizer.ForTts(text);
 
@@ -147,7 +167,7 @@ internal sealed class TtsController
         {
             AudioClip? prerenderedClip = null;
             yield return AudioClipLoader.LoadOgg(prerenderedPath, c => prerenderedClip = c);
-            if (prerenderedClip != null && !ct.IsCancellationRequested)
+            if (prerenderedClip != null && !ct.IsCancellationRequested && LeaseStillCurrent(presentation))
             {
                 PlayClip(prerenderedClip);
                 yield break;
@@ -211,10 +231,18 @@ internal sealed class TtsController
 
         AudioClip? clip = null;
         yield return AudioClipLoader.LoadWav(path, c => clip = c);
-        if (clip == null || ct.IsCancellationRequested) yield break;
+        if (clip == null || ct.IsCancellationRequested || !LeaseStillCurrent(presentation)) yield break;
 
         PlayClip(clip);
     }
+
+    /// <summary>
+    /// Cooperative-ownership gate: a stale completion (line replaced, window closed,
+    /// scene/session switched while synth ran) must not start audio. IsCurrent is
+    /// main-thread-only and coroutines resume on the main thread.
+    /// </summary>
+    private static bool LeaseStillCurrent(IDialoguePresentation? presentation)
+        => presentation == null || presentation.IsCurrent;
 
     private void PlayClip(AudioClip clip)
     {

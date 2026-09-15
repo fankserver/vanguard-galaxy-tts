@@ -12,10 +12,14 @@ PLUGIN_DIR := $(GAME_DIR)/BepInEx/plugins
 # Resolve dotnet — prefer explicit local SDK, fall back to PATH
 DOTNET   ?= $(shell command -v dotnet 2>/dev/null || echo /tmp/dnsdk/dotnet/dotnet)
 
+# Compile-time reference for the cooperative dialogue service. Build the API
+# sibling in Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release).
+VGAPI_DLL := ../vanguard-galaxy-api/VGModAPI.Abstractions/bin/Release/netstandard2.1/VGModAPI.Abstractions.dll
+
 BEPINEX_VERSION := 5.4.23.5
 BEPINEX_URL     := https://github.com/BepInEx/BepInEx/releases/download/v$(BEPINEX_VERSION)/BepInEx_win_x64_$(BEPINEX_VERSION).zip
 
-.PHONY: all build link-asm clean deploy deploy-bundle deploy-prerender \
+.PHONY: all build link-asm link-api test clean deploy deploy-bundle deploy-prerender \
         install-bepinex check-bepinex \
         download-kokoro package
 
@@ -56,8 +60,18 @@ link-asm:
 		echo "Linked Newtonsoft.Json.dll" ; \
 	fi
 
-build: link-asm
+# Symlink the VGModAPI abstractions assembly used for the cooperative
+# dialogue-service playback path. Never committed (see .gitignore).
+link-api:
+	@mkdir -p VGTTS/lib
+	@test -s "$(VGAPI_DLL)" || { echo 'Build VGModAPI Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release) — or set VGAPI_DLL.'; exit 1; }
+	ln -sfn "$(abspath $(VGAPI_DLL))" VGTTS/lib/VGModAPI.Abstractions.dll
+
+build: link-asm link-api
 	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) build VGTTS/VGTTS.csproj -c $(CONFIG)
+
+test: link-asm link-api
+	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
 
 # Install layout: everything under $(PLUGIN_DIR)/VGTTS/ — the plugin resolves
 # prerender/ and tools/ relative to its own DLL location (no extra VGTTS/

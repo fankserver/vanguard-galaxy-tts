@@ -48,6 +48,21 @@
       <HintPath>lib/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
+
+    <!-- VGModAPI — canonical cooperative dialogue-service consumer types
+         (IDialogueService.Subscribe / TryAcquirePresentation). Symlinked from
+         the sibling vanguard-galaxy-api Release build via `make link-api`.
+         Private=false: the VGModAPI plugin ships this assembly next to its own
+         DLL in BepInEx/plugins and BepInEx's resolver loads it from there; a
+         second copy in our deploy folder would risk duplicate-type ambiguity. -->
+    <Reference Include="VGModAPI.Abstractions">
+      <HintPath>lib/VGModAPI.Abstractions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="VGTTS.Tests" />
   </ItemGroup>
 
 </Project>
