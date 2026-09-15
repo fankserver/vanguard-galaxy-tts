@@ -103,10 +103,13 @@ internal sealed class DialogueTtsCoordinator : IDisposable
         if (snapshot.Change == DialogueChange.Closed) return;
 
         // Disabled or unavailable → do not even claim: a rival cooperative provider
-        // must still be able to win the line's presentation lease.
+        // must still be able to win the line's presentation lease. The same applies
+        // to speakable-less lines: the API's claim is sticky until the next change,
+        // so claiming a line we will never speak would lock a rival out of it.
         if (!_enabled()) return;
         _lastAvailability = _service.Availability;
         if (!_lastAvailability.IsAvailable) return;
+        if (string.IsNullOrWhiteSpace(snapshot.Text)) return;
 
         var presentation = _service.TryAcquirePresentation(_ownerId, snapshot.ConversationId, snapshot.Sequence);
         if (presentation == null)
@@ -127,12 +130,6 @@ internal sealed class DialogueTtsCoordinator : IDisposable
         }
 
         var text = snapshot.Text ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            ReleaseHeld();
-            return;
-        }
-
         var speaker = _speakerResolver(snapshot.Speaker ?? string.Empty) ?? "<unknown>";
         _info($"[dialogue-api] {speaker}: \"{text}\"");
         _player.Speak(speaker, text, presentation);

@@ -31,6 +31,11 @@ internal static class DialogueSpeaker
     /// falls back to an ordinal match against <c>Characters.captain.name</c> — the
     /// player's chosen callsign. A procedurally-named NPC wearing the exact same
     /// callsign is rare and would merely borrow the captain voice for that line.
+    /// Secondary effects of such a false positive: the line is cached under the
+    /// captain key in the persistent cache dir (surviving the session-cache wipe),
+    /// name-keyed <c>DropCache</c> eviction for that NPC won't find the misfiled
+    /// WAV, and the unprerendered log records it as a captain-warmed miss. Bounded
+    /// hygiene noise only — no behavioral damage.
     /// </summary>
     public static string ResolveFromName(string? nativeSpeaker)
     {

@@ -203,7 +203,7 @@ public class DialogueTtsCoordinatorTests
     }
 
     [Fact]
-    public void EmptyText_ReleasesLease_WithoutSpeaking()
+    public void EmptyText_NeverClaims_SoRivalCanOwn_WithoutSpeaking()
     {
         var svc = new FakeDialogueService();
         var player = new FakePlayer();
@@ -212,8 +212,11 @@ public class DialogueTtsCoordinatorTests
         svc.Present("Ricko", "   ");
 
         Assert.Empty(player.Spoken);
-        var lease = Assert.Single(svc.Leases);
-        Assert.True(lease.Disposed);
+        // Whitespace lines must not occupy the sticky per-line claim (Core clears
+        // it only on the next change, so a claimed-and-discarded line locks rivals out).
+        Assert.Empty(svc.Claims);
+        Assert.Empty(svc.Leases);
+        Assert.Empty(player.Script);
     }
 
     [Fact]
