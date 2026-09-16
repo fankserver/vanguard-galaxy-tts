@@ -12,18 +12,18 @@ PLUGIN_DIR := $(GAME_DIR)/BepInEx/plugins
 # Resolve dotnet — prefer explicit local SDK, fall back to PATH
 DOTNET   ?= $(shell command -v dotnet 2>/dev/null || echo /tmp/dnsdk/dotnet/dotnet)
 
+# Compile-time reference for the cooperative dialogue service. Build the API
+# sibling in Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release).
+VGAPI_DLL := ../vanguard-galaxy-api/VGModAPI.Abstractions/bin/Release/netstandard2.1/VGModAPI.Abstractions.dll
+
 BEPINEX_VERSION := 5.4.23.5
 BEPINEX_URL     := https://github.com/BepInEx/BepInEx/releases/download/v$(BEPINEX_VERSION)/BepInEx_win_x64_$(BEPINEX_VERSION).zip
 
-.PHONY: all build link-asm clean deploy deploy-bundle deploy-prerender \
+.PHONY: all build link-asm link-api test clean deploy deploy-bundle deploy-prerender \
         install-bepinex check-bepinex \
         download-kokoro package
 
 all: build
-
-.PHONY: test
-test:
-	$(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
 
 # One-time: download and unpack BepInEx 5 into the game folder.
 # Safe to re-run: overwrites loader files but leaves user plugins + config alone.
@@ -56,8 +56,20 @@ link-asm:
 		echo "Linked Newtonsoft.Json.dll" ; \
 	fi
 
+# Opt-in: replace the committed VGModAPI.Abstractions.dll reference with a
+# symlink to a local sibling API Release build (develop-against-unreleased-API).
+# Run explicitly; `make build`/`make test` otherwise use the committed copy,
+# matching CI. Restore with: git checkout -- VGTTS/lib/VGModAPI.Abstractions.dll
+link-api:
+	@mkdir -p VGTTS/lib
+	@test -s "$(VGAPI_DLL)" || { echo 'Build VGModAPI Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release) — or set VGAPI_DLL.'; exit 1; }
+	ln -sfn "$(abspath $(VGAPI_DLL))" VGTTS/lib/VGModAPI.Abstractions.dll
+
 build: link-asm
 	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) build VGTTS/VGTTS.csproj -c $(CONFIG)
+
+test: link-asm
+	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
 
 # Install layout: everything under $(PLUGIN_DIR)/VGTTS/ — the plugin resolves
 # prerender/ and tools/ relative to its own DLL location (no extra VGTTS/
