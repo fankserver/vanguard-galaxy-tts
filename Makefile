@@ -25,10 +25,6 @@ BEPINEX_URL     := https://github.com/BepInEx/BepInEx/releases/download/v$(BEPIN
 
 all: build
 
-.PHONY: test
-test:
-	$(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
-
 # One-time: download and unpack BepInEx 5 into the game folder.
 # Safe to re-run: overwrites loader files but leaves user plugins + config alone.
 install-bepinex:
@@ -60,17 +56,19 @@ link-asm:
 		echo "Linked Newtonsoft.Json.dll" ; \
 	fi
 
-# Symlink the VGModAPI abstractions assembly used for the cooperative
-# dialogue-service playback path. Never committed (see .gitignore).
+# Opt-in: replace the committed VGModAPI.Abstractions.dll reference with a
+# symlink to a local sibling API Release build (develop-against-unreleased-API).
+# Run explicitly; `make build`/`make test` otherwise use the committed copy,
+# matching CI. Restore with: git checkout -- VGTTS/lib/VGModAPI.Abstractions.dll
 link-api:
 	@mkdir -p VGTTS/lib
 	@test -s "$(VGAPI_DLL)" || { echo 'Build VGModAPI Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release) — or set VGAPI_DLL.'; exit 1; }
 	ln -sfn "$(abspath $(VGAPI_DLL))" VGTTS/lib/VGModAPI.Abstractions.dll
 
-build: link-asm link-api
+build: link-asm
 	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) build VGTTS/VGTTS.csproj -c $(CONFIG)
 
-test: link-asm link-api
+test: link-asm
 	DOTNET_ROOT=$(dir $(DOTNET)) $(DOTNET) test VGTTS.Tests/VGTTS.Tests.csproj -c $(CONFIG)
 
 # Install layout: everything under $(PLUGIN_DIR)/VGTTS/ — the plugin resolves

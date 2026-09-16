@@ -16,9 +16,13 @@ obj/
 # - Newtonsoft.Json.dll: symlinked from the game install locally, pulled via
 #   NuGet on CI. Not committed.
 VGTTS/lib/Newtonsoft.Json.dll
-# - VGModAPI.Abstractions.dll: symlink to the sibling vanguard-galaxy-api
-#   Release build, refreshed by `make link-api`. Never committed.
-VGTTS/lib/VGModAPI.Abstractions.dll
+# - VGModAPI.Abstractions.dll: committed compile-time reference for the
+#   cooperative dialogue-service consumer types (our own API artifact, same
+#   rationale as the committed stub: CI builds without sibling checkouts).
+#   `make link-api` may replace it with a symlink to a local API Release build
+#   for development; gitignores below keep accidental symlink re-commits out
+#   only if the tracked file is deliberately removed.
+!VGTTS/lib/VGModAPI.Abstractions.dll
 VGTTS/lib/*.pdb
 !VGTTS/lib/.gitkeep
 !VGTTS/lib/Assembly-CSharp.dll

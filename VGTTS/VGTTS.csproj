@@ -50,8 +50,10 @@
     </Reference>
 
     <!-- VGModAPI — canonical cooperative dialogue-service consumer types
-         (IDialogueService.Subscribe / TryAcquirePresentation). Symlinked from
-         the sibling vanguard-galaxy-api Release build via `make link-api`.
+         (IDialogueService.Subscribe / TryAcquirePresentation). Committed at
+         lib/VGModAPI.Abstractions.dll (own-code artifact; CI builds without a
+         sibling checkout, same rationale as the publicized stub); rebuild via
+         `make link-api` when iterating against an unreleased local API.
          Private=false: the VGModAPI plugin ships this assembly next to its own
          DLL in BepInEx/plugins and BepInEx's resolver loads it from there; a
          second copy in our deploy folder would risk duplicate-type ambiguity. -->
