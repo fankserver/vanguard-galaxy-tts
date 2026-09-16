@@ -54,6 +54,26 @@ jobs:
           fi
           echo "Publicized stripped reference present: $(du -h VGTTS/lib/Assembly-CSharp.dll | cut -f1)"
 
+      - name: Fetch pinned VGModAPI.Abstractions (public v0.2.8)
+        run: |
+          set -euo pipefail
+          # Reproducible-build contract: compile the dialogue-service consumer
+          # against the SHIPPED public API artifact — never an unpublished local
+          # build. Immutable release tag + zip checksum + pinned inner-DLL hash
+          # + assembly-version assertion.
+          VER=0.2.8
+          ASSET="VGModAPI-${VER}-stable.zip"
+          BASE="https://github.com/fankserver/vanguard-galaxy-api/releases/download/v${VER}/${ASSET}"
+          mkdir -p /tmp/vgapi && cd /tmp/vgapi
+          curl -fsSL -o "$ASSET" "$BASE"
+          curl -fsSL -o "$ASSET.sha256" "$BASE.sha256"
+          sha256sum -c "$ASSET.sha256"
+          unzip -qo "$ASSET" "VGModAPI/VGModAPI.Abstractions.dll"
+          echo "d8b80d0ac98a31b3d7052abddc4efa6779a7adc62a3dd43efee58e5ae0e5cb13  VGModAPI/VGModAPI.Abstractions.dll" | sha256sum -c -
+          grep -qx "0.2.8.0" <(strings VGModAPI/VGModAPI.Abstractions.dll) \
+            || { echo "::error::fetched VGModAPI.Abstractions.dll is not assembly 0.2.8.0"; exit 1; }
+          mv VGModAPI/VGModAPI.Abstractions.dll "$GITHUB_WORKSPACE/VGTTS/lib/VGModAPI.Abstractions.dll"
+
       - name: Build VGTTS.dll
         run: dotnet build VGTTS/VGTTS.csproj -c Debug --nologo
 
@@ -94,6 +114,15 @@ jobs:
 
           # Kokoro + sherpa-onnx bundle
           cp -r tools/kokoro tools/sherpa "$PKG_DIR/tools/"
+
+          # Compile-only guard, over the FULLY staged tree (review #14 P1: must
+          # run after every copy). The VGModAPI plugin ships VGModAPI.Abstractions.dll
+          # in its own folder; a second copy anywhere here invites duplicate-type
+          # ambiguity — it must never reach the payload (csproj Private=false).
+          if find "$PKG_DIR" -name 'VGModAPI.Abstractions.dll' | grep -q .; then
+            echo "::error::VGModAPI.Abstractions.dll leaked into the release payload; keep it compile-only (Private=false)."
+            exit 1
+          fi
 
           OGGS=$(find "$PKG_DIR/prerender/" -name "*.ogg" | wc -l)
           SIZE=$(du -sh "$PKG_DIR" | cut -f1)

@@ -56,10 +56,13 @@ link-asm:
 		echo "Linked Newtonsoft.Json.dll" ; \
 	fi
 
-# Opt-in: replace the committed VGModAPI.Abstractions.dll reference with a
-# symlink to a local sibling API Release build (develop-against-unreleased-API).
-# Run explicitly; `make build`/`make test` otherwise use the committed copy,
-# matching CI. Restore with: git checkout -- VGTTS/lib/VGModAPI.Abstractions.dll
+# Symlink the abstractions reference to a local sibling API Release build.
+# Dev override only — the file is NOT tracked (see .gitignore); CI/release
+# fetches the pinned public v0.2.8 asset (release.yml). For a plain local
+# build without the API repo checked out, reproduce that fetch step once:
+#   curl -fsSL -o /tmp/vg.zip https://github.com/fankserver/vanguard-galaxy-api/releases/download/v0.2.8/VGModAPI-0.2.8-stable.zip
+#   unzip -qo /tmp/vg.zip VGModAPI/VGModAPI.Abstractions.dll -d /tmp/vg
+#   cp /tmp/vg/VGModAPI/VGModAPI.Abstractions.dll VGTTS/lib/
 link-api:
 	@mkdir -p VGTTS/lib
 	@test -s "$(VGAPI_DLL)" || { echo 'Build VGModAPI Release first: (cd ../vanguard-galaxy-api && dotnet build -c Release) — or set VGAPI_DLL.'; exit 1; }
