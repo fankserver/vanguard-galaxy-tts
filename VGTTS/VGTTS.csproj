@@ -50,10 +50,11 @@
     </Reference>
 
     <!-- VGModAPI — canonical cooperative dialogue-service consumer types
-         (IDialogueService.Subscribe / TryAcquirePresentation). Committed at
-         lib/VGModAPI.Abstractions.dll (own-code artifact; CI builds without a
-         sibling checkout, same rationale as the publicized stub); rebuild via
-         `make link-api` when iterating against an unreleased local API.
+         (IDialogueService.Subscribe / TryAcquirePresentation). The DLL at
+         lib/VGModAPI.Abstractions.dll is NOT tracked: release.yml fetches the
+         pinned public v0.2.8 release asset (checksum/hash/version asserted)
+         and `make link-api` is the dev-override onto a local API build — the
+         build contract is always the SHIPPED API, never an unpublished build.
          Private=false: the VGModAPI plugin ships this assembly next to its own
          DLL in BepInEx/plugins and BepInEx's resolver loads it from there; a
          second copy in our deploy folder would risk duplicate-type ambiguity. -->
